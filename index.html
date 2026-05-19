@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fish Tracking Data System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f0f2f5;
+            padding-bottom: 50px;
+        }
+        .app-container {
+            max-width: 850px;
+            margin: 40px auto;
+        }
+        .header-banner {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+        }
+        .main-card {
+            background: white;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .data-table-card {
+            background: white;
+            margin-top: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        /* Style for the unified autofill button */
+        .btn-autofill {
+            background-color: #17a2b8;
+            color: white;
+        }
+        .btn-autofill:hover {
+            background-color: #138496;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container app-container">
+    <div class="header-banner">
+        <h1 class="h3 mb-0">Fish Tracking Data Sheet</h1>
+    </div>
+    
+    <div class="main-card">
+        <form id="fishEntryForm">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Date</label>
+                    <div class="input-group">
+                        <input type="date" id="date" class="form-control" required>
+                        <!-- Updated: This now triggers the full autofill -->
+                        <button type="button" class="btn btn-autofill" onclick="autoFillAll()">📍 Auto-fill Current</button>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Time (24h)</label>
+                    <input type="time" id="time" class="form-control" required>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label fw-bold">Tag ID</label>
+                    <input type="text" id="tagId" class="form-control" placeholder="Unique Tag ID" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Depth (m)</label>
+                    <input type="number" step="0.1" id="depth" class="form-control" placeholder="0.0" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Latitude</label>
+                    <input type="number" step="0.0000001" id="lat" class="form-control" placeholder="0.000000" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Longitude</label>
+                    <input type="number" step="0.0000001" id="lng" class="form-control" placeholder="0.000000" required>
+                </div>
+
+                <div class="col-12 border-top pt-3 mt-4">
+                    <button type="submit" class="btn btn-primary w-100 py-2 fs-5">Add Entry to Sheet</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-table-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 mb-0">Captured Entries</h2>
+            <div class="d-flex gap-2">
+                <button class="btn btn-danger" onclick="clearAllEntries()">
+                    🗑️ Clear All
+                </button>
+                <button class="btn btn-success" onclick="exportStructuredCSV()">
+                    💾 Export to .csv
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Tag ID</th>
+                        <th>Depth</th>
+                        <th>Latitude</th>
+                        <th>Longitude</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let entries = JSON.parse(localStorage.getItem('fish_tracking_entries')) || [];
+
+    window.onload = renderTable;
+
+    // Unified function to fill Date, Time, and GPS
+    function autoFillAll() {
+        const now = new Date();
+
+        // 1. Set Date
+        document.getElementById('date').value = now.toISOString().split('T')[0];
+
+        // 2. Set Time
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('time').value = `${hours}:${minutes}`;
+
+        // 3. Set GPS Coordinates
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                document.getElementById('lat').value = pos.coords.latitude.toFixed(7);
+                document.getElementById('lng').value = pos.coords.longitude.toFixed(7);
+            }, (err) => {
+                alert("Location Error: " + err.message + "\n(Please ensure location services are enabled)");
+            });
+        } else {
+            alert("Geolocation not supported by this browser.");
+        }
+    }
+
+    document.getElementById('fishEntryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const newEntry = {
+            id: Date.now(),
+            date: document.getElementById('date').value,
+            time: document.getElementById('time').value,
+            tagId: document.getElementById('tagId').value,
+            depth: document.getElementById('depth').value,
+            lat: document.getElementById('lat').value,
+            lng: document.getElementById('lng').value
+        };
+
+        entries.push(newEntry);
+        updateStorage();
+        renderTable();
+        this.reset();
+    });
+
+    function updateStorage() {
+        localStorage.setItem('fish_tracking_entries', JSON.stringify(entries));
+    }
+
+    function deleteEntry(id) {
+        if (confirm("Are you sure you want to delete this entry?")) {
+            entries = entries.filter(item => item.id !== id);
+            updateStorage();
+            renderTable();
+        }
+    }
+
+    function clearAllEntries() {
+        if (confirm("🚨 WARNING: Are you absolutely sure you want to permanently clear all tracked fish entries? This action cannot be undone.")) {
+            entries = [];
+            updateStorage();
+            renderTable();
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('dataTableBody');
+        tbody.innerHTML = '';
+        
+        entries.forEach(item => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.date}</td>
+                    <td>${item.time}</td>
+                    <td>${item.tagId}</td>
+                    <td>${item.depth}</td>
+                    <td>${item.lat}</td>
+                    <td>${item.lng}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteEntry(${item.id})">Remove</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // Integrated function with dynamic filename logic
+    function exportStructuredCSV() {
+        if (entries.length === 0) {
+            alert("No data available to export.");
+            return;
+        }
+
+        const headers = ["Date", "Time", "Tag ID", "Depth", "Latitude", "Longitude"];
+        
+        const csvRows = [
+            headers.join(","),
+            ...entries.map(e => [
+                e.date,
+                e.time,
+                `"${e.tagId.replace(/"/g, '""')}"`,
+                e.depth,
+                e.lat,
+                e.lng
+            ].join(","))
+        ];
+
+        const csvString = csvRows.join("\r\n");
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        
+        // --- NEW FILENAME LOGIC ---
+        // Get the current date in YYYY-MM-DD format
+        const exportDate = new Date().toISOString().split('T')[0];
+        const fileName = `fish_tracking_data_${exportDate}.csv`;
+        
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        // --------------------------
+        
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
